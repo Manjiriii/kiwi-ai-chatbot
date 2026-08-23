@@ -97,10 +97,21 @@ class UrlRequest(BaseModel):
     url: str
 
 
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
 # --- API Routes ---
 
+frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.exists(os.path.join(frontend_dist, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+
 @app.get("/")
+@app.get("/index.html")
 def root():
+    index_file = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     return {
         "name": "Kiwi AI Assistant 🦜",
         "tagline": "Your curious AI companion for answers, research and the web.",
@@ -108,6 +119,7 @@ def root():
         "status": "online",
         "docs": "/docs"
     }
+
 
 
 @app.get("/api/health")
