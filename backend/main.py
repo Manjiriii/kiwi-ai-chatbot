@@ -132,6 +132,16 @@ def api_root():
     }
 
 
+@app.get("/debug")
+@app.get("/api/debug")
+def debug_endpoint(request: Request):
+    return {
+        "url_path": request.url.path,
+        "scope_path": request.scope.get("path"),
+        "headers": {k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v for k, v in request.headers.items()}
+    }
+
+
 @app.get("/api/health")
 @app.get("/health")
 def health_check():
