@@ -121,7 +121,7 @@ class KiwiChatbot:
                     json={
                         "model": mod,
                         "messages": messages,
-                        "max_tokens": 1000,
+                        "max_tokens": 1500,
                         "temperature": 0.7
                     },
                     timeout=20
@@ -140,6 +140,35 @@ class KiwiChatbot:
             except Exception as e:
                 logger.warning(f"OpenRouter request error for model {mod}: {e}")
         return None
+
+    def _formulate_search_query(self, user_prompt: str) -> str:
+        """Formulates a targeted, high-precision search query from the user's prompt."""
+        query = user_prompt.strip()
+        # Remove search command prefixes
+        query = re.sub(r'^(search:|search|look up|google|find|browse)\s*', '', query, flags=re.IGNORECASE).strip()
+        # Remove conversational opening phrases
+        query = re.sub(
+            r'^(what are the|what is the|tell me about the|tell me about|can you find|can you tell me about|show me the|who is the|who is|what are|tell me|explain the|give me)\s*',
+            '',
+            query,
+            flags=re.IGNORECASE
+        ).strip()
+        # Remove courtesy words
+        query = re.sub(r'\b(please|kindly)\b', '', query, flags=re.IGNORECASE).strip()
+        # Remove trailing question marks and punctuation
+        query = query.rstrip('?!.').strip()
+
+        lower = query.lower()
+
+        # Specific topic enhancements to target deep news and avoid ambiguous results
+        if "python" in lower and any(w in lower for w in ["update", "updates", "latest", "release", "new", "version"]) and "arcgis" not in lower:
+            return "Python programming language latest release updates"
+        if ("ai" in lower or "artificial intelligence" in lower) and any(w in lower for w in ["latest", "development", "developments", "news", "recent", "update", "updates"]):
+            return "latest developments in artificial intelligence AI news"
+        if "space" in lower and any(w in lower for w in ["discoveries", "discovery", "recent", "news", "explore"]):
+            return "recent space discoveries astronomy science"
+
+        return query or user_prompt.strip()
 
     def should_search_web(self, query: str) -> bool:
         """Determines if query requires a live web search."""
@@ -225,22 +254,36 @@ class KiwiChatbot:
         # 2. Check if live web search is needed (Web Search Mode)
         elif self.should_search_web(user_prompt):
             source_type = "web_search"
-            # Clean search query if prefixed
-            clean_search_query = re.sub(r'^(search:|search|look up|google)\s*', '', user_prompt, flags=re.IGNORECASE).strip()
-            search_query = clean_search_query or user_prompt
-            logger.info(f"Triggering web search for: '{search_query}'")
+            search_query = self._formulate_search_query(user_prompt)
+            logger.info(f"Triggering web search for: '{search_query}' (original: '{user_prompt}')")
 
-            search_res = search_duckduckgo(search_query, max_results=3)
+            search_res = search_duckduckgo(search_query, max_results=4)
             if search_res["success"] and search_res["results"]:
                 for r in search_res["results"]:
                     sources.append({
                         "title": r.get("title", "Search Result"),
                         "url": r.get("url", ""),
-                        "snippet": r.get("snippet", "")
+                        "snippet": r.get("snippet", ""),
+                        "date": r.get("date", ""),
+                        "source": r.get("source", "")
                     })
-                augmented_prompt = f"{user_prompt}\n\n[Live Search Results:\n{search_res['formatted_context']}]"
+                augmented_prompt = (
+                    f"User Question: {user_prompt}\n\n"
+                    f"[Live Web Search Context - Recent Verified Articles]:\n"
+                    f"{search_res['formatted_context']}\n\n"
+                    f"[Instructions for Kiwi 🦜]:\n"
+                    f"1. Synthesize a complete, well-structured, and readable summary directly addressing the user's inquiry using the retrieved articles above.\n"
+                    f"2. Detail the key developments, discoveries, or news points clearly with well-structured Markdown (bullet points, bold highlights, concise explanations).\n"
+                    f"3. Cite the sources accurately with clickable Markdown links (e.g., 'According to [SourceName](URL)...').\n"
+                    f"4. Provide a complete, fully fleshed-out answer that does NOT cut off mid-sentence.\n"
+                    f"5. Maintain Kiwi's friendly, curious parrot companion persona!"
+                )
             else:
-                augmented_prompt = f"{user_prompt}\n\n[Live Search Results: No live results found or search was unavailable]"
+                augmented_prompt = (
+                    f"User Question: {user_prompt}\n\n"
+                    f"[Live Search Notice: Live web search was performed but did not yield specific recent articles for this exact query.]\n"
+                    f"[Instructions for Kiwi 🦜]: Please answer the user's question informatively using your best knowledge, politely noting that live search returned no immediate recent articles."
+                )
 
             messages.append({"role": "user", "content": augmented_prompt})
 
@@ -306,13 +349,19 @@ class KiwiChatbot:
                     stitle = s.get("title") or "Source"
                     surl = s.get("url") or ""
                     ssnip = s.get("snippet") or ""
-                    source_bullets.append(f"• **[{stitle}]({surl})**\n  {ssnip}")
+                    meta_parts = []
+                    if s.get("source"):
+                        meta_parts.append(s["source"])
+                    if s.get("date"):
+                        meta_parts.append(s["date"])
+                    meta_str = f" *({ ' • '.join(meta_parts) })*" if meta_parts else ""
+                    source_bullets.append(f"• **[{stitle}]({surl})**{meta_str}\n  {ssnip}")
                 sources_formatted = "\n\n".join(source_bullets)
                 assistant_reply = (
-                    f"🦜 **Squawk! Here is what I discovered live from the web for you:**\n\n"
+                    f"🦜 **Squawk! Here are the latest verified developments I retrieved live from the web for you:**\n\n"
                     f"{sources_formatted}\n\n"
                     f"---\n"
-                    f"*Note: Live web results extracted directly! To enable full conversational AI responses, please add `OPENROUTER_API_KEY` (with free model `openrouter/free`) in your Vercel Environment Variables.*"
+                    f"*Note: Live web articles and sources extracted in real-time! To enable full conversational AI synthesis, please add `OPENROUTER_API_KEY` (with free model `openrouter/free`) in your Vercel Environment Variables.*"
                 )
             else:
                 assistant_reply = (

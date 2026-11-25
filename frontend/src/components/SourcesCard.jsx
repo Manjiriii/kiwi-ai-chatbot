@@ -79,16 +79,23 @@ export const SourcesCard = ({ sourceType, sources = [], searchQuery, websiteUrl 
               href={src.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group block p-2 rounded-xl bg-white dark:bg-gray-800/80 border border-sky-500/20 hover:border-sky-500/50 transition-all shadow-sm"
+              className="group block p-2.5 rounded-xl bg-white dark:bg-gray-800/80 border border-sky-500/20 hover:border-sky-500/50 transition-all shadow-sm"
             >
-              <div className="flex items-center justify-between gap-2 mb-0.5">
-                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors line-clamp-1">
                   {src.title}
                 </span>
-                <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-sky-500 flex-shrink-0" />
+                <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-sky-500 flex-shrink-0" />
               </div>
+              {(src.source || src.date) && (
+                <div className="flex items-center gap-1.5 text-[10px] text-sky-600 dark:text-sky-400 font-medium mb-1">
+                  {src.source && <span className="bg-sky-500/10 px-1.5 py-0.5 rounded">{src.source}</span>}
+                  {src.source && src.date && <span className="text-gray-400">•</span>}
+                  {src.date && <span className="text-gray-400 dark:text-gray-400">{src.date}</span>}
+                </div>
+              )}
               {src.snippet && (
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                <p className="text-[11px] text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed">
                   {src.snippet}
                 </p>
               )}
