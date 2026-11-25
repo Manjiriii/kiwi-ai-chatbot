@@ -2,11 +2,22 @@
  * API service client for Kiwi Chatbot backend.
  */
 
-const API_BASE = '/api';
+async function apiRequest(endpoint, options = {}) {
+  // Try /api/endpoint first, automatically fall back to /endpoint if 404
+  try {
+    const res = await fetch(`/api${endpoint}`, options);
+    if (res.status !== 404) {
+      return res;
+    }
+  } catch (err) {
+    // network failure on /api prefix, fallback to direct endpoint
+  }
+  return await fetch(endpoint, options);
+}
 
 export async function sendChatMessage(message, conversationId, history = []) {
   try {
-    const res = await fetch(`${API_BASE}/chat`, {
+    const res = await apiRequest('/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,7 +46,7 @@ export async function sendChatMessage(message, conversationId, history = []) {
 
 export async function checkBackendHealth() {
   try {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await apiRequest('/health');
     if (!res.ok) return { status: 'offline' };
     return await res.json();
   } catch (error) {
@@ -44,7 +55,7 @@ export async function checkBackendHealth() {
 }
 
 export async function testWebSearch(query) {
-  const res = await fetch(`${API_BASE}/search`, {
+  const res = await apiRequest('/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query })
@@ -53,7 +64,7 @@ export async function testWebSearch(query) {
 }
 
 export async function testUrlReader(url) {
-  const res = await fetch(`${API_BASE}/fetch-url`, {
+  const res = await apiRequest('/fetch-url', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url })
