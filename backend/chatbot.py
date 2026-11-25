@@ -10,13 +10,10 @@ import re
 import logging
 from typing import List, Dict, Any, Optional
 
-# Ensure UTF-8 output on Windows consoles
-if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+# Ensure backend directory is in python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 from dotenv import load_dotenv
 

@@ -148,11 +148,16 @@ def health_check():
     """Health and configuration status."""
     token = chatbot_instance.get_token()
     has_token = bool(token and len(token.strip()) > 0)
+    groq_configured = bool(os.getenv("GROQ_API_KEY") and len(os.getenv("GROQ_API_KEY").strip()) > 0)
+    openrouter_configured = bool(os.getenv("OPENROUTER_API_KEY") and len(os.getenv("OPENROUTER_API_KEY").strip()) > 0)
     return {
         "status": "healthy",
         "mascot": "Kiwi the Parrot 🦜",
         "model": chatbot_instance.model,
-        "hf_token_configured": has_token
+        "hf_token_configured": has_token,
+        "groq_configured": groq_configured,
+        "openrouter_configured": openrouter_configured,
+        "ai_ready": has_token or groq_configured or openrouter_configured
     }
 
 

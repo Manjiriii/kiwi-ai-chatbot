@@ -133,8 +133,8 @@ export const SettingsModal = ({
               <div className="space-y-1 text-[11px] text-gray-600 dark:text-gray-400">
                 <p>Status: <span className="text-emerald-500 font-semibold">{backendInfo.status}</span></p>
                 <p>Model: <span className="font-mono text-gray-800 dark:text-gray-200">{backendInfo.model || 'meta-llama/Meta-Llama-3-70B-Instruct'}</span></p>
-                <p>HF Token: <span className={backendInfo.hf_token_configured ? "text-emerald-500 font-semibold" : "text-amber-500 font-semibold"}>
-                  {backendInfo.hf_token_configured ? "Configured ✓" : "Not Set (Set in backend/.env)"}
+                <p>AI Provider: <span className={backendInfo.ai_ready ? "text-emerald-500 font-semibold" : "text-amber-500 font-semibold"}>
+                  {backendInfo.groq_configured ? "Groq (Free LLaMA 3 70B) ✓" : backendInfo.hf_token_configured ? "Hugging Face Configured ✓" : backendInfo.openrouter_configured ? "OpenRouter Configured ✓" : "Set GROQ_API_KEY or HF_TOKEN in Vercel"}
                 </span></p>
               </div>
             ) : (
