@@ -8,13 +8,10 @@ import sys
 import logging
 from typing import List, Dict, Optional, Any
 
-# Ensure UTF-8 output on Windows consoles
-if sys.platform == "win32":
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+# Ensure backend directory is in python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,12 +44,14 @@ origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
+    "https://kiwi-ai-chatbot.vercel.app",
     "*"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -122,7 +121,19 @@ def root():
 
 
 
+@app.get("/api")
+@app.get("/api/")
+def api_root():
+    return {
+        "status": "online",
+        "mascot": "Kiwi AI Assistant 🦜",
+        "tagline": "Your curious AI companion for answers, research and the web.",
+        "endpoints": ["/api/health", "/api/chat", "/api/search", "/api/fetch-url", "/docs"]
+    }
+
+
 @app.get("/api/health")
+@app.get("/health")
 def health_check():
     """Health and configuration status."""
     token = chatbot_instance.get_token()
@@ -135,8 +146,8 @@ def health_check():
     }
 
 
-
 @app.post("/api/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse)
 def chat_endpoint(payload: ChatRequest):
     """
     Main chat endpoint. Handles conversation history, intent detection,
@@ -156,12 +167,14 @@ def chat_endpoint(payload: ChatRequest):
 
 
 @app.post("/api/search")
+@app.post("/search")
 def search_endpoint(payload: SearchRequest):
     """Direct web search test endpoint."""
     return search_duckduckgo(payload.query, max_results=payload.max_results or 3)
 
 
 @app.post("/api/fetch-url")
+@app.post("/fetch-url")
 def url_endpoint(payload: UrlRequest):
     """Direct URL reading test endpoint."""
     return fetch_website_content(payload.url)

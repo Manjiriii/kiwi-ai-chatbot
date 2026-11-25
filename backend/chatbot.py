@@ -90,6 +90,63 @@ class KiwiChatbot:
         self.token = token
         self._init_client()
 
+    def _query_groq(self, messages: List[Dict[str, str]], api_key: str) -> Optional[str]:
+        """Queries Groq free API (supports LLaMA 3.3 70B & LLaMA 3 70B for free)."""
+        import requests
+        candidate_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]
+        for mod in candidate_models:
+            try:
+                res = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key.strip()}", "Content-Type": "application/json"},
+                    json={"model": mod, "messages": messages, "max_tokens": 1000, "temperature": 0.7},
+                    timeout=15
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data["choices"][0]["message"]["content"]
+                    if content:
+                        self.model = f"groq/{mod}"
+                        return content
+                else:
+                    logger.warning(f"Groq API notice ({res.status_code}): {res.text[:120]}")
+            except Exception as e:
+                logger.warning(f"Groq request error: {e}")
+        return None
+
+    def _query_openrouter(self, messages: List[Dict[str, str]], api_key: str) -> Optional[str]:
+        """Queries OpenRouter API (free tier models)."""
+        import requests
+        candidate_models = [
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "meta-llama/llama-3-8b-instruct:free",
+            "google/gemini-2.0-flash-lite-preview-02-05:free"
+        ]
+        for mod in candidate_models:
+            try:
+                res = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key.strip()}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://kiwi-ai-chatbot.vercel.app",
+                        "X-Title": "Kiwi AI Chatbot"
+                    },
+                    json={"model": mod, "messages": messages, "max_tokens": 1000, "temperature": 0.7},
+                    timeout=15
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data["choices"][0]["message"]["content"]
+                    if content:
+                        self.model = f"openrouter/{mod}"
+                        return content
+                else:
+                    logger.warning(f"OpenRouter API notice ({res.status_code}): {res.text[:120]}")
+            except Exception as e:
+                logger.warning(f"OpenRouter request error: {e}")
+        return None
+
     def should_search_web(self, query: str) -> bool:
         """Determines if query requires a live web search."""
         lower = query.lower()
@@ -197,53 +254,95 @@ class KiwiChatbot:
         else:
             messages.append({"role": "user", "content": user_prompt})
 
-        # Query Hugging Face InferenceClient with fallback support
-        candidate_models = [
-            self.model,
-            "meta-llama/Llama-3.3-70B-Instruct",
-            "meta-llama/Meta-Llama-3-8B-Instruct",
-            "Qwen/Qwen2.5-72B-Instruct",
-            "mistralai/Mistral-7B-Instruct-v0.3"
-        ]
-        # Remove duplicates while preserving order
-        candidate_models = list(dict.fromkeys(candidate_models))
-
         assistant_reply = None
-        last_error = None
-        current_token = self.get_token()
 
-        for mod in candidate_models:
-            try:
-                client = InferenceClient(
-                    model=mod,
-                    token=current_token if current_token and current_token.strip() else None
-                )
-                response_obj = client.chat_completion(
-                    messages=messages,
-                    max_tokens=1000,
-                    temperature=0.7,
-                )
-                assistant_reply = response_obj.choices[0].message.content
-                if assistant_reply:
-                    # Update active model
-                    self.model = mod
-                    break
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                logger.warning(f"Inference error with model {mod}: {err_str}")
-                # If it's a token authorization error, stop trying other models
-                if "Authorization header is correct" in err_str or "401" in err_str:
-                    break
-                continue
+        # 1. Try Groq free provider if GROQ_API_KEY is configured
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if groq_api_key and groq_api_key.strip():
+            logger.info("Attempting inference via Groq free API...")
+            assistant_reply = self._query_groq(messages, groq_api_key)
 
+        # 2. Try OpenRouter free provider if OPENROUTER_API_KEY is configured
+        if not assistant_reply:
+            openrouter_key = os.getenv("OPENROUTER_API_KEY")
+            if openrouter_key and openrouter_key.strip():
+                logger.info("Attempting inference via OpenRouter API...")
+                assistant_reply = self._query_openrouter(messages, openrouter_key)
+
+        # 3. Query Hugging Face InferenceClient with fallback support
+        if not assistant_reply:
+            candidate_models = [
+                self.model,
+                "meta-llama/Llama-3.3-70B-Instruct",
+                "meta-llama/Meta-Llama-3-8B-Instruct",
+                "Qwen/Qwen2.5-72B-Instruct",
+                "mistralai/Mistral-7B-Instruct-v0.3"
+            ]
+            # Remove duplicates while preserving order
+            candidate_models = list(dict.fromkeys(candidate_models))
+
+            last_error = None
+            current_token = self.get_token()
+
+            for mod in candidate_models:
+                try:
+                    client = InferenceClient(
+                        model=mod,
+                        token=current_token if current_token and current_token.strip() else None
+                    )
+                    response_obj = client.chat_completion(
+                        messages=messages,
+                        max_tokens=1000,
+                        temperature=0.7,
+                    )
+                    assistant_reply = response_obj.choices[0].message.content
+                    if assistant_reply:
+                        self.model = mod
+                        break
+                except Exception as e:
+                    last_error = e
+                    err_str = str(e)
+                    logger.warning(f"Inference error with model {mod}: {err_str}")
+                    # If it's a token authorization or payment error, stop trying other models
+                    if "Authorization header is correct" in err_str or "401" in err_str or "402" in err_str or "Payment Required" in err_str:
+                        break
+                    continue
+
+        # 4. Handle errors and provide informative fallback
         if assistant_reply is None:
             err_str = str(last_error) if last_error else "Unknown error"
-            if "Authorization header is correct" in err_str or "token" in err_str.lower() or "401" in err_str:
+            
+            # If search or website content was gathered, present it directly
+            if sources and ("402" in err_str or "Payment" in err_str or "credits" in err_str.lower()):
+                source_bullets = []
+                for s in sources:
+                    stitle = s.get("title") or "Source"
+                    surl = s.get("url") or ""
+                    ssnip = s.get("snippet") or ""
+                    source_bullets.append(f"• **[{stitle}]({surl})**\n  {ssnip}")
+                sources_formatted = "\n\n".join(source_bullets)
+                assistant_reply = (
+                    f"🦜 **Squawk! Here is what I discovered live from the web for you:**\n\n"
+                    f"{sources_formatted}\n\n"
+                    f"---\n"
+                    f"*Note: Hugging Face's router returned a `402 Payment Required` credits notice for `{self.model}`. "
+                    f"Kiwi successfully extracted the live facts above! To enable full LLM generation at zero cost, you can add a free `GROQ_API_KEY` (100% free LLaMA 3 70B) in your Vercel Environment Variables.*"
+                )
+            elif "402" in err_str or "payment" in err_str.lower() or "credits" in err_str.lower():
+                assistant_reply = (
+                    f"🦜 **Squawk! Kiwi here!**\n\n"
+                    f"Hugging Face's serverless router returned `402 Payment Required` for **{self.model}** "
+                    f"(Hugging Face now requires pre-paid credits for external providers).\n\n"
+                    f"**To unlock AI responses at 100% zero cost:**\n"
+                    f"1. **Option 1 (Free Groq Key - Recommended):** Get a free API key at [console.groq.com](https://console.groq.com) and add `GROQ_API_KEY=your_key` in your **Vercel Project Settings → Environment Variables**. Groq hosts LLaMA 3 70B with ultra-fast speed for free!\n"
+                    f"2. **Option 2 (Free OpenRouter Key):** Get a key at [openrouter.ai](https://openrouter.ai) and add `OPENROUTER_API_KEY=your_key`.\n"
+                    f"3. **Option 3 (Hugging Face Credits):** Add pre-paid credits at [huggingface.co/settings/billing](https://huggingface.co/settings/billing) if you prefer using Hugging Face."
+                )
+            elif "Authorization header is correct" in err_str or "token" in err_str.lower() or "401" in err_str:
                 assistant_reply = (
                     "🦜 **Squawk!** It looks like a Hugging Face API Token is needed or has expired.\n\n"
-                    "Please verify your `HF_TOKEN` in the `backend/.env` file to unlock "
-                    f"the full power of **{self.model}**!\n\n"
+                    "Please verify your `HF_TOKEN` in the `backend/.env` file or in your Vercel Environment Variables to unlock "
+                    f"the power of **{self.model}**!\n\n"
                     f"*Raw Error: {err_str}*"
                 )
             elif "loading" in err_str.lower() or "503" in err_str:
