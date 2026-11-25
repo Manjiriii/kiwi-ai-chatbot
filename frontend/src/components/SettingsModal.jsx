@@ -125,17 +125,22 @@ export const SettingsModal = ({
           <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200/80 dark:border-gray-800 text-xs">
             <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-white mb-2">
               <Server className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Backend Status</span>
+              <span>Backend & AI Status</span>
             </div>
             {loadingHealth ? (
               <p className="text-gray-500">Checking status...</p>
             ) : backendInfo ? (
-              <div className="space-y-1 text-[11px] text-gray-600 dark:text-gray-400">
+              <div className="space-y-1.5 text-[11px] text-gray-600 dark:text-gray-400">
                 <p>Status: <span className="text-emerald-500 font-semibold">{backendInfo.status}</span></p>
-                <p>Model: <span className="font-mono text-gray-800 dark:text-gray-200">{backendInfo.model || 'meta-llama/Meta-Llama-3-70B-Instruct'}</span></p>
-                <p>AI Provider: <span className={backendInfo.ai_ready ? "text-emerald-500 font-semibold" : "text-amber-500 font-semibold"}>
-                  {backendInfo.groq_configured ? "Groq (Free LLaMA 3 70B) ✓" : backendInfo.hf_token_configured ? "Hugging Face Configured ✓" : backendInfo.openrouter_configured ? "OpenRouter Configured ✓" : "Set GROQ_API_KEY or HF_TOKEN in Vercel"}
+                <p>Model: <span className="font-mono text-gray-800 dark:text-gray-200">{backendInfo.configured_model || backendInfo.model || 'openrouter/free'}</span></p>
+                <p>AI Provider: <span className={backendInfo.openrouter_configured ? "text-emerald-500 font-semibold" : backendInfo.hf_token_configured ? "text-blue-500 font-semibold" : "text-amber-500 font-semibold"}>
+                  {backendInfo.openrouter_configured ? "OpenRouter (openrouter/free) ✓" : backendInfo.hf_token_configured ? "Hugging Face (Fallback) ✓" : "Set OPENROUTER_API_KEY in Vercel"}
                 </span></p>
+                {backendInfo.last_successful_provider && (
+                  <p>Last Active AI: <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+                    {backendInfo.last_successful_provider} ({backendInfo.last_successful_model || 'active'})
+                  </span></p>
+                )}
               </div>
             ) : (
               <p className="text-red-400">Backend disconnected.</p>

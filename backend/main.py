@@ -148,16 +148,26 @@ def health_check():
     """Health and configuration status."""
     token = chatbot_instance.get_token()
     has_token = bool(token and len(token.strip()) > 0)
-    groq_configured = bool(os.getenv("GROQ_API_KEY") and len(os.getenv("GROQ_API_KEY").strip()) > 0)
-    openrouter_configured = bool(os.getenv("OPENROUTER_API_KEY") and len(os.getenv("OPENROUTER_API_KEY").strip()) > 0)
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    openrouter_configured = bool(openrouter_key and len(openrouter_key.strip()) > 0)
+
+    primary_provider = "openrouter" if openrouter_configured else ("huggingface" if has_token else "none")
+    configured_model = os.getenv("OPENROUTER_MODEL", "openrouter/free") if openrouter_configured else os.getenv("HF_MODEL", "meta-llama/Meta-Llama-3-70B-Instruct")
+
     return {
         "status": "healthy",
         "mascot": "Kiwi the Parrot 🦜",
-        "model": chatbot_instance.model,
-        "hf_token_configured": has_token,
-        "groq_configured": groq_configured,
+        "primary_provider": primary_provider,
+        "configured_model": configured_model,
+        "last_successful_provider": chatbot_instance.last_used_provider,
+        "last_successful_model": chatbot_instance.last_used_model,
+        "providers_configured": {
+            "openrouter": openrouter_configured,
+            "huggingface": has_token
+        },
         "openrouter_configured": openrouter_configured,
-        "ai_ready": has_token or groq_configured or openrouter_configured
+        "hf_token_configured": has_token,
+        "ai_ready": openrouter_configured or has_token
     }
 
 
