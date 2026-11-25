@@ -78,7 +78,7 @@ def _search_bing_news_rss(query: str, max_results: int = 4) -> List[Dict[str, st
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
-        resp = requests.get(url, headers=headers, timeout=7)
+        resp = requests.get(url, headers=headers, timeout=5)
         if resp.status_code == 200 and resp.content:
             root = ET.fromstring(resp.content)
             for item in root.findall('.//item'):
@@ -130,7 +130,7 @@ def _search_google_news_rss(query: str, max_results: int = 4) -> List[Dict[str, 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
-        resp = requests.get(url, headers=headers, timeout=7)
+        resp = requests.get(url, headers=headers, timeout=5)
         if resp.status_code == 200 and resp.content:
             root = ET.fromstring(resp.content)
             for item in root.findall('.//item'):

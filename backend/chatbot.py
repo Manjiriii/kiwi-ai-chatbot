@@ -98,10 +98,8 @@ class KiwiChatbot:
         candidate_models = [
             configured_model,
             "openrouter/free",
-            "google/gemma-4-26b-a4b-it:free",
-            "nvidia/nemotron-3.5-lightning:free",
-            "baidu/ernie-5.5-flash-preview:free",
-            "meta-llama/llama-3.3-70b-instruct:free"
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "google/gemma-4-26b-a4b-it:free"
         ]
         # Remove duplicates while preserving order
         candidate_models = list(dict.fromkeys(candidate_models))
@@ -124,7 +122,7 @@ class KiwiChatbot:
                         "max_tokens": 1500,
                         "temperature": 0.7
                     },
-                    timeout=20
+                    timeout=12
                 )
                 if res.status_code == 200:
                     data = res.json()
